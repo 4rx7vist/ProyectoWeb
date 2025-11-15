@@ -47,7 +47,7 @@ public class RegistrarPacienteController extends HttpServlet {
 		paciente.setHistorialSesiones(null);
 
 		PacienteDAO dao = new PacienteDAO();
-		boolean exito = dao.crear(paciente);
+		boolean exito = dao.create(paciente);
 
 		if (exito) {
 			response.sendRedirect("registro_exitoso.jsp");

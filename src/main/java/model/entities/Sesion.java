@@ -40,11 +40,11 @@ public class Sesion implements Serializable {
     public Sesion() {}
     // Constructor, getters y setters...
 
-	public Sesion(Long id, Paciente idPaciente, Date fecha, String dolorInicial, String dolorFinal, String comentario,
+	public Sesion(Long id, Paciente paciente, Date fecha, String dolorInicial, String dolorFinal, String comentario,
 			Serie serie) {
 		super();
 		this.id = id;
-		this.idPaciente = idPaciente;
+		this.paciente = paciente;
 		this.fecha = fecha;
 		this.dolorInicial = dolorInicial;
 		this.dolorFinal = dolorFinal;

@@ -12,7 +12,7 @@ public class PruebaConexion {
 
         em.getTransaction().begin();
         Instructor i = new Instructor();
-        i.setId("123");
+        i.setCedula("123");
         i.setNombre("Prueba");
         i.setCorreo("prueba@correo.com");
         i.setPassword("123");
