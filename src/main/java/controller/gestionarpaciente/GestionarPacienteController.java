@@ -20,15 +20,26 @@ public class GestionarPacienteController extends HttpServlet {
 
     @Serial
     private static final long serialVersionUID = 1L;
+    private static final String MESSAGE_TYPE_ATTR = "messageType";
+    private static final String MESSAGE_ATTR = "message";
+    private static final String REDIRECT_LISTAR = "/GestionarPacienteController?route=listarPacientes";
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        this.router(req, resp);
+        try {
+            this.router(req, resp);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        this.router(req, resp);
+        try {
+            this.router(req, resp);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void router(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -108,17 +119,13 @@ public class GestionarPacienteController extends HttpServlet {
             throws ServletException, IOException {
         Paciente paciente = parsePacienteFromRequest(req);
         PacienteService pacienteService = new PacienteService();
+
         if (pacienteService.guardarExistente(paciente)) {
-            HttpSession session = req.getSession();
-            session.setAttribute("messageType", "info");
-            session.setAttribute("message", "Paciente actualizado exitosamente.");
-            resp.sendRedirect(req.getContextPath() + "/GestionarPacienteController?route=listarPacientes");
+            setSessionMessage(req, "info", "Paciente actualizado exitosamente");
         } else {
-            HttpSession session = req.getSession();
-            session.setAttribute("messageType", "error");
-            session.setAttribute("message", "Error al actualizar paciente.");
-            resp.sendRedirect(req.getContextPath() + "/GestionarPacienteController?route=listarPacientes");
+            setSessionMessage(req, "error", "Error al actualizar paciente");
         }
+        resp.sendRedirect(req.getContextPath() + REDIRECT_LISTAR);
     }
 
     private void registrarPacienteFormulario(HttpServletResponse resp) throws IOException {
@@ -132,16 +139,11 @@ public class GestionarPacienteController extends HttpServlet {
             PacienteService pacienteService = new PacienteService();
 
             if (pacienteService.guardar(paciente)) {
-                HttpSession session = req.getSession();
-                session.setAttribute("messageType", "info");
-                session.setAttribute("message", "Paciente creado exitosamente.");
-                resp.sendRedirect(req.getContextPath() + "/GestionarPacienteController?route=listarPacientes");
+                setSessionMessage(req, "info", "Paciente creado exitosamente");
             } else {
-                HttpSession session = req.getSession();
-                session.setAttribute("messageType", "error");
-                session.setAttribute("message", "Error al registrar paciente.");
-                resp.sendRedirect(req.getContextPath() + "/GestionarPacienteController?route=listarPacientes");
+                setSessionMessage(req, "error", "Error al registrar paciente");
             }
+            resp.sendRedirect(req.getContextPath() + REDIRECT_LISTAR);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -174,5 +176,14 @@ public class GestionarPacienteController extends HttpServlet {
         } catch (Exception e) {
             throw new ServletException("Error al parsear los datos del formulario.", e);
         }
+    }
+
+    /**
+     * Método auxiliar para establecer mensajes en la sesión
+     */
+    private void setSessionMessage(HttpServletRequest req, String type, String message) {
+        HttpSession session = req.getSession();
+        session.setAttribute(MESSAGE_TYPE_ATTR, type);
+        session.setAttribute(MESSAGE_ATTR, message);
     }
 }

@@ -2,6 +2,7 @@ package controller.crearserieterapeutica;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Logger;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -20,23 +21,24 @@ public class CrearSerieTerapeuticaController extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
-    // ================== CONSTANTES PARA STRINGS DUPLICADOS ==================
+    private static final Logger LOGGER = Logger.getLogger(CrearSerieTerapeuticaController.class.getName());
+
     private static final String ATTR_POSTURAS = "posturas";
     private static final String ATTR_ERROR = "error";
     private static final String VIEW_CREAR = "/view/crearSerieTerapeutica.jsp";
     private static final String VIEW_CONFIRMACION = "/view/confirmacion.jsp";
 
-    private transient final SerieService serieService = new SerieService();
-    private transient final PosturaDAO posturaDAO = new PosturaDAO();
+    private final transient SerieService serieService = new SerieService();
+    private final transient PosturaDAO posturaDAO = new PosturaDAO();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        this.router(req, resp);
+        router(req, resp);
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        this.router(req, resp);
+        router(req, resp);
     }
 
     private void router(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -49,8 +51,8 @@ public class CrearSerieTerapeuticaController extends HttpServlet {
         }
 
         Instructor instructor = (Instructor) usuario;
-
         String route = req.getParameter("route");
+
         if (route == null) {
             route = "dashboard";
         }
@@ -60,7 +62,7 @@ public class CrearSerieTerapeuticaController extends HttpServlet {
                 crearSerie(req, resp);
                 break;
             case "guardar":
-                guardar(req, resp, instructor);
+                validarYGuardarSerie(req, resp, instructor);
                 break;
             default:
                 resp.sendRedirect(req.getContextPath() + "/view/dashboard.jsp");
@@ -68,55 +70,58 @@ public class CrearSerieTerapeuticaController extends HttpServlet {
     }
 
     private void crearSerie(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        List<Postura> posturas = posturaDAO.buscarTodas();
-        req.setAttribute(ATTR_POSTURAS, posturas);
+        cargarPosturasEnRequest(req);
         req.getRequestDispatcher(VIEW_CREAR).forward(req, resp);
     }
 
-    private void guardar(HttpServletRequest req, HttpServletResponse resp, Instructor instructor) throws ServletException, IOException {
+    private void validarYGuardarSerie(HttpServletRequest req, HttpServletResponse resp, Instructor instructor)
+            throws ServletException, IOException {
+
         try {
             String nombreSerie = req.getParameter("nombreSerie");
             String[] posturasSeleccionadas = req.getParameterValues(ATTR_POSTURAS);
             String sesionesStr = req.getParameter("numSesiones");
 
-            if (nombreSerie == null || posturasSeleccionadas == null || sesionesStr == null ||
-                nombreSerie.isEmpty() || sesionesStr.isEmpty()) {
-
-                req.setAttribute(ATTR_ERROR, "Faltan datos para crear la serie.");
-                List<Postura> posturas = posturaDAO.buscarTodas();
-                req.setAttribute(ATTR_POSTURAS, posturas);
-                req.getRequestDispatcher(VIEW_CREAR).forward(req, resp);
+            if (!esValido(nombreSerie, posturasSeleccionadas, sesionesStr)) {
+                mostrarErrorConPosturas(req, resp, "Faltan datos para crear la serie.");
                 return;
             }
 
             int numeroSesionesRecomendadas = Integer.parseInt(sesionesStr);
             List<String> nombresPosturas = List.of(posturasSeleccionadas);
 
-            Serie serie = serieService.crearSerie(
-                nombreSerie,
-                numeroSesionesRecomendadas,
-                nombresPosturas,
-                instructor
-            );
+            Serie serie = serieService.crearSerie(nombreSerie, numeroSesionesRecomendadas, nombresPosturas, instructor);
 
-            boolean guardadoExitoso = serieService.guardar(serie);
-
-            if (guardadoExitoso) {
+            if (serieService.guardar(serie)) {
                 req.setAttribute("serieCreada", serie);
                 req.getRequestDispatcher(VIEW_CONFIRMACION).forward(req, resp);
             } else {
-                req.setAttribute(ATTR_ERROR, "No se pudo guardar la serie.");
-                List<Postura> posturas = posturaDAO.buscarTodas();
-                req.setAttribute(ATTR_POSTURAS, posturas);
-                req.getRequestDispatcher(VIEW_CREAR).forward(req, resp);
+                mostrarErrorConPosturas(req, resp, "No se pudo guardar la serie.");
             }
 
+        } catch (NumberFormatException e) {
+            LOGGER.warning("Error al parsear número de sesiones: " + e.getMessage());
+            mostrarErrorConPosturas(req, resp, "Error: número de sesiones inválido");
         } catch (Exception e) {
-            e.printStackTrace();
-            req.setAttribute(ATTR_ERROR, "Error al guardar la serie: " + e.getMessage());
-            List<Postura> posturas = posturaDAO.buscarTodas();
-            req.setAttribute(ATTR_POSTURAS, posturas);
-            req.getRequestDispatcher(VIEW_CREAR).forward(req, resp);
+            LOGGER.severe("Error inesperado al guardar la serie: " + e.getMessage());
+            mostrarErrorConPosturas(req, resp, "Error al guardar la serie: " + e.getMessage());
         }
+    }
+
+    private boolean esValido(String nombreSerie, String[] posturas, String sesiones) {
+        return nombreSerie != null && !nombreSerie.isEmpty() &&
+                posturas != null && posturas.length > 0 &&
+                sesiones != null && !sesiones.isEmpty();
+    }
+
+    private void cargarPosturasEnRequest(HttpServletRequest req) {
+        req.setAttribute(ATTR_POSTURAS, posturaDAO.buscarTodas());
+    }
+
+    private void mostrarErrorConPosturas(HttpServletRequest req, HttpServletResponse resp, String mensaje)
+            throws ServletException, IOException {
+        req.setAttribute(ATTR_ERROR, mensaje);
+        cargarPosturasEnRequest(req);
+        req.getRequestDispatcher(VIEW_CREAR).forward(req, resp);
     }
 }
