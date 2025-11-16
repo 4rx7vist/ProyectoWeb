@@ -2,6 +2,7 @@ package controller.crearserieterapeutica;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Logger;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -18,98 +19,113 @@ import model.service.SerieService;
 @WebServlet("/CrearSerieTerapeuticaController")
 public class CrearSerieTerapeuticaController extends HttpServlet {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
+    private static final Logger LOGGER = Logger.getLogger(CrearSerieTerapeuticaController.class.getName());
 
-	private final SerieService serieService = new SerieService();
-	private final PosturaDAO posturaDAO = new PosturaDAO();
+    private transient SerieService serieService = new SerieService();
+    private transient PosturaDAO posturaDAO = new PosturaDAO();
 
-	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		this.router(req, resp);
-	}
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        router(req, resp);
+    }
 
-	@Override
-	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		this.router(req, resp);
-	}
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        router(req, resp);
+    }
 
-	private void router(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		HttpSession session = req.getSession(false);
-		Object usuario = (session != null) ? session.getAttribute("usuario") : null;
+    private void router(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        Instructor instructor = obtenerInstructor(req, resp);
+	if (instructor == null) {
+            return;
+        }
 
-		if (!(usuario instanceof Instructor)) {
-			resp.sendRedirect(req.getContextPath() + "/view/inicioSesion.jsp");
-			return;
-		}
+        String route = req.getParameter("route");
+        if (route == null) {
+            route = "dashboard";
+        }
 
-		Instructor instructor = (Instructor) usuario;
+        switch (route) {
+            case "crearSerie":
+                crearSerie(req, resp);
+                break;
+            case "guardar":
+                guardar(req, resp, instructor);
+                break;
+            default:
+                resp.sendRedirect(req.getContextPath() + "/view/dashboard.jsp");
+        }
+    }
 
-		String route = req.getParameter("route");
-		if (route == null) {
-			route = "dashboard";
-		}
+    private Instructor obtenerInstructor(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        HttpSession session = req.getSession(false);
+        Object usuario = (session != null) ? session.getAttribute("usuario") : null;
 
-		switch (route) {
-			case "crearSerie":
-				crearSerie(req, resp);
-				break;
-			case "guardar":
-				guardar(req, resp, instructor); // ya validado
-				break;
-			default:
-				resp.sendRedirect(req.getContextPath() + "/view/dashboard.jsp");
-		}
-	}
+        if (!(usuario instanceof Instructor)) {
+            resp.sendRedirect(req.getContextPath() + "/view/inicioSesion.jsp");
+            return null;
+        }
 
-	private void crearSerie(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		List<Postura> posturas = posturaDAO.buscarTodas();
-		req.setAttribute("posturas", posturas);
-		req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
-	}
+        return (Instructor) usuario;
+    }
 
-	private void guardar(HttpServletRequest req, HttpServletResponse resp, Instructor instructor) throws ServletException, IOException {
-		try {
-			String nombreSerie = req.getParameter("nombreSerie");
-			String[] posturasSeleccionadas = req.getParameterValues("posturas");
-			String sesionesStr = req.getParameter("numSesiones");
+    private void crearSerie(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        cargarPosturasEnRequest(req);
+        req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
+    }
 
-			if (nombreSerie == null || posturasSeleccionadas == null || sesionesStr == null ||
-				nombreSerie.isEmpty() || sesionesStr.isEmpty()) {
-				req.setAttribute("error", "Faltan datos para crear la serie.");
-				List<Postura> posturas = posturaDAO.buscarTodas();
-				req.setAttribute("posturas", posturas);
-				req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
-				return;
-			}
+    private void guardar(HttpServletRequest req, HttpServletResponse resp, Instructor instructor) throws ServletException, IOException {
+        try {
+            validarYGuardarSerie(req, resp, instructor);
+        } catch (NumberFormatException e) {
+            LOGGER.warning("Error al parsear número de sesiones: " + e.getMessage());
+            mostrarErrorConPosturas(req, resp, "Error: número de sesiones inválido");
+        } catch (Exception e) {
+            LOGGER.severe("Error inesperado al guardar la serie: " + e.getMessage());
+            mostrarErrorConPosturas(req, resp, "Error al guardar la serie: " + e.getMessage());
+        }
+    }
 
-			int numeroSesionesRecomendadas = Integer.parseInt(sesionesStr);
-			List<String> nombresPosturas = List.of(posturasSeleccionadas);
+    private void validarYGuardarSerie(HttpServletRequest req, HttpServletResponse resp, Instructor instructor) 
+            throws ServletException, IOException {
+        String nombreSerie = req.getParameter("nombreSerie");
+        String[] posturasSeleccionadas = req.getParameterValues("posturas");
+        String sesionesStr = req.getParameter("numSesiones");
 
-			Serie serie = serieService.crearSerie(
-				nombreSerie,
-				numeroSesionesRecomendadas,
-				nombresPosturas,
-				instructor
-			);
+        if (!esValido(nombreSerie, posturasSeleccionadas, sesionesStr)) {
+            mostrarErrorConPosturas(req, resp, "Faltan datos para crear la serie.");
+            return;
+        }
 
-			boolean guardadoExitoso = serieService.guardar(serie);
+        int numeroSesionesRecomendadas = Integer.parseInt(sesionesStr);
+        List<String> nombresPosturas = List.of(posturasSeleccionadas);
 
-			if (guardadoExitoso) {
-				req.setAttribute("serieCreada", serie);
-				req.getRequestDispatcher("/view/confirmacion.jsp").forward(req, resp);
-			} else {
-				req.setAttribute("error", "No se pudo guardar la serie.");
-				List<Postura> posturas = posturaDAO.buscarTodas();
-				req.setAttribute("posturas", posturas);
-				req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
-			}
+        Serie serie = serieService.crearSerie(nombreSerie, numeroSesionesRecomendadas, nombresPosturas, instructor);
+        
+        if (serieService.guardar(serie)) {
+            req.setAttribute("serieCreada", serie);
+            req.getRequestDispatcher("/view/confirmacion.jsp").forward(req, resp);
+        } else {
+            mostrarErrorConPosturas(req, resp, "No se pudo guardar la serie.");
+        }
+    }
 
-		} catch (Exception e) {
-			e.printStackTrace();
-			req.setAttribute("error", "Error al guardar la serie: " + e.getMessage());
-			List<Postura> posturas = posturaDAO.buscarTodas();
-			req.setAttribute("posturas", posturas);
-			req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
-		}
-	}
+    private boolean esValido(String nombreSerie, String[] posturas, String sesiones) {
+        return nombreSerie != null && !nombreSerie.isEmpty() &&
+               posturas != null && posturas.length > 0 &&
+               sesiones != null && !sesiones.isEmpty();
+    }
+
+    private void cargarPosturasEnRequest(HttpServletRequest req) {
+        List<Postura> posturas = posturaDAO.buscarTodas();
+        req.setAttribute("posturas", posturas);
+    }
+
+    private void mostrarErrorConPosturas(HttpServletRequest req, HttpServletResponse resp, String mensaje) 
+            throws ServletException, IOException {
+        req.setAttribute("error", mensaje);
+        cargarPosturasEnRequest(req);
+        req.getRequestDispatcher("/view/crearSerieTerapeutica.jsp").forward(req, resp);
+    }
 }
