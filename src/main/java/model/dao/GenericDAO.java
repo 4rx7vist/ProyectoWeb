@@ -1,12 +1,14 @@
 package model.dao;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
-import jakarta.persistence.Persistence;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import jakarta.persistence.*;
 
 public abstract class GenericDAO<T> {
+
+    private static final Logger LOGGER = Logger.getLogger(GenericDAO.class.getName());
     private static final EntityManagerFactory emf = Persistence.createEntityManagerFactory("persistence");
     private final Class<T> entityClass;
 
@@ -30,7 +32,7 @@ public abstract class GenericDAO<T> {
             if (transaction.isActive()) {
                 transaction.rollback();
             }
-            System.out.println("Couldn't create entity: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Couldn't create entity: " + e.getMessage(), e);
             return false;
         } finally {
             em.close();
@@ -42,7 +44,7 @@ public abstract class GenericDAO<T> {
         try {
             return em.find(entityClass, id);
         } catch (Exception e) {
-            System.out.println("Couldn't find entity: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Couldn't find entity: " + e.getMessage(), e);
             return null;
         } finally {
             em.close();
@@ -61,7 +63,7 @@ public abstract class GenericDAO<T> {
             if (transaction.isActive()) {
                 transaction.rollback();
             }
-            System.out.println("Couldn't update entity: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Couldn't update entity: " + e.getMessage(), e);
             return false;
         } finally {
             em.close();
@@ -79,12 +81,13 @@ public abstract class GenericDAO<T> {
                 transaction.commit();
                 return true;
             }
+            LOGGER.log(Level.WARNING, () -> "Entity not found for removal with id: " + id);
             return false;
         } catch (RuntimeException e) {
             if (transaction.isActive()) {
                 transaction.rollback();
             }
-            System.out.println("Couldn't remove entity: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Couldn't remove entity: " + e.getMessage(), e);
             return false;
         } finally {
             em.close();
@@ -95,10 +98,10 @@ public abstract class GenericDAO<T> {
         EntityManager em = getEntityManager();
         try {
             String jpql = "SELECT e FROM " + entityClass.getSimpleName() + " e";
-            Query query = em.createQuery(jpql, entityClass);
+            TypedQuery<T> query = em.createQuery(jpql, entityClass);
             return query.getResultList();
         } catch (Exception e) {
-            System.out.println("Couldn't retrieve entities: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Couldn't retrieve entities: " + e.getMessage(), e);
             return List.of();
         } finally {
             em.close();
