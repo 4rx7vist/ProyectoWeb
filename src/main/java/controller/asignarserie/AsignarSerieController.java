@@ -18,6 +18,19 @@ public class AsignarSerieController extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
+
+    //CONSTANTES INTERNAS
+
+    private static final String USUARIO = "usuario";
+    private static final String ASIGNACION_EXITOSA = "asignacionExitosa";
+    private static final String MESSAGE_TYPE = "messageType";
+    private static final String MESSAGE = "message";
+    private static final String WARNING = "warning";
+    private static final String SUCCESS = "success";
+    private static final String ROUTE = "route";
+
+    // MÉTODOS
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -34,19 +47,19 @@ public class AsignarSerieController extends HttpServlet {
             throws ServletException, IOException {
 
         HttpSession session = request.getSession(false);
-        Instructor instructor = (session != null) ? (Instructor) session.getAttribute("usuario") : null;
+        Instructor instructor = (session != null) ? (Instructor) session.getAttribute(USUARIO) : null;
 
         if (instructor == null) {
             response.sendRedirect(request.getContextPath() + "/LoginController?route=entrar");
             return;
         }
 
-        String route = request.getParameter("route");
+        String route = request.getParameter(ROUTE);
 
         switch (route == null ? "listar" : route) {
             case "listar":
-                listarPacientes(request, response);
-                listarSeries(request, response);
+                listarPacientes(request);
+                listarSeries(request);
                 request.getRequestDispatcher("view/AsignarSerie.jsp").forward(request, response);
                 break;
 
@@ -59,10 +72,10 @@ public class AsignarSerieController extends HttpServlet {
         }
     }
 
-    private void listarPacientes(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+
+    private void listarPacientes(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        Instructor instructor = (session != null) ? (Instructor) session.getAttribute("usuario") : null;
+        Instructor instructor = (session != null) ? (Instructor) session.getAttribute(USUARIO) : null;
 
         if (instructor != null) {
             String instructorId = instructor.getCedula();
@@ -72,10 +85,9 @@ public class AsignarSerieController extends HttpServlet {
         }
     }
 
-    private void listarSeries(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    private void listarSeries(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        Instructor instructor = (session != null) ? (Instructor) session.getAttribute("usuario") : null;
+        Instructor instructor = (session != null) ? (Instructor) session.getAttribute(USUARIO) : null;
 
         if (instructor != null) {
             String instructorId = instructor.getCedula();
@@ -85,6 +97,8 @@ public class AsignarSerieController extends HttpServlet {
         }
     }
 
+
+
     private void asignarSerie(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
@@ -92,29 +106,33 @@ public class AsignarSerieController extends HttpServlet {
         String serieId = request.getParameter("serieId");
 
         if (pacienteId == null || serieId == null) {
-            request.setAttribute("asignacionExitosa", false);
-            request.setAttribute("messageType", "warning");
-            request.setAttribute("message", " Faltan parámetros para asignar la serie.");
+
+            request.setAttribute(ASIGNACION_EXITOSA, false);
+            request.setAttribute(MESSAGE_TYPE, WARNING);
+            request.setAttribute(MESSAGE, " Faltan parámetros para asignar la serie.");
+
         } else {
+
             PacienteDAO pacienteDAO = new PacienteDAO();
 
             if (!pacienteDAO.tieneSerieAsignada(pacienteId)) {
+
                 boolean resultado = pacienteDAO.guardarSerie(pacienteId, serieId);
 
                 if (resultado) {
-                    request.setAttribute("asignacionExitosa", true);
-                    request.setAttribute("messageType", "success");
-                    request.setAttribute("message", " Se asignó correctamente la serie al paciente.");
+                    request.setAttribute(ASIGNACION_EXITOSA, true);
+                    request.setAttribute(MESSAGE_TYPE, SUCCESS);
+                    request.setAttribute(MESSAGE, " Se asignó correctamente la serie al paciente.");
                 } else {
-                    request.setAttribute("asignacionExitosa", false);
-                    request.setAttribute("messageType", "warning");
-                    request.setAttribute("message", " Error al asignar la serie.");
+                    request.setAttribute(ASIGNACION_EXITOSA, false);
+                    request.setAttribute(MESSAGE_TYPE, WARNING);
+                    request.setAttribute(MESSAGE, " Error al asignar la serie.");
                 }
 
             } else {
-                request.setAttribute("asignacionExitosa", false);
-                request.setAttribute("messageType", "warning");
-                request.setAttribute("message", " El paciente ya tiene una serie asignada.");
+                request.setAttribute(ASIGNACION_EXITOSA, false);
+                request.setAttribute(MESSAGE_TYPE, WARNING);
+                request.setAttribute(MESSAGE, " El paciente ya tiene una serie asignada.");
             }
         }
 

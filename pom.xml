@@ -27,7 +27,7 @@
 				<configuration>
 					<container>
 						<containerId>tomcat10x</containerId>
-						<type>embedded</type>
+						<type>installed</type>
 					</container>
 					<configuration>
 						<properties>
